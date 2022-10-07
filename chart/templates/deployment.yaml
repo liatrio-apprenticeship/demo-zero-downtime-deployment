@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "zero-downtime-deploy-demo.fullname" . }}
+  labels:
+    {{- include "zero-downtime-deploy-demo.labels" . | nindent 4 }}
+spec:
+  replicas: 5
+  strategy:
+      # type: Recreate
+      type: RollingUpdate
+      rollingUpdate:
+          maxSurge: 1
+          maxUnavailable: 1 
+  selector:
+    matchLabels:
+      {{- include "zero-downtime-deploy-demo.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "zero-downtime-deploy-demo.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "zero-downtime-deploy-demo.serviceAccountName" . }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "zero-downtime-deploy-demo:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            failureThreshold: 30
+            periodSeconds: 2
+          env:
+            - name: VERSION
+              value: {{ .Values.image.tag }}
